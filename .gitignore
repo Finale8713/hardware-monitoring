@@ -1,0 +1,22 @@
+# Build / package output
+hwmon/target/
+hwmon/dist/
+
+# Local / debug leftovers
+_run-out.txt
+_debug-out.txt
+*.log
+
+# Secrets and local keys (never commit)
+.env
+.env.*
+**/api-key.txt
+**/*secret*
+**/*credentials*
+
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/
