@@ -78,11 +78,14 @@ llama.cpp generation/prompt throughput shows green when active and dims when idl
 |--------|--------|
 | CPU utilization | sysinfo |
 | CPU temperature | Windows: LibreHardwareMonitor **Remote Web Server** (`http://127.0.0.1:8085/data.json`) or WMI · Linux: hwmon sysfs |
-| CPU power (PSU estimate) | LibreHardwareMonitor **Remote Web Server** (CPU Package power sensor) — Windows only |
-| GPU | nvidia-smi |
-| Memory / disks | sysinfo |
+| CPU power (PSU estimate) | Windows: LibreHardwareMonitor **Remote Web Server** (CPU Package power sensor) · Linux: RAPL (`/sys/class/powercap`) |
+| GPU (temperature, utilization, VRAM, power, core clock) | nvidia-smi |
+| Memory / disks / swap | sysinfo |
+| Top processes (CPU%, memory) | sysinfo |
+| GPU processes | `nvidia-smi --query-compute-apps` |
+| Per-process disk-IO | Windows: WMI · Linux: not available |
 | Disk read/write throughput | Windows: WMI (`Win32_PerfFormattedData_PerfDisk_LogicalDisk`) · Linux: `/proc/diskstats` |
-| Network throughput | sysinfo (delta between refreshes) |
+| Network throughput / packets / totals / errors | sysinfo (delta between refreshes) |
 | llama.cpp inference stats | `llama-server` `GET /metrics` (Prometheus) + `/props` |
 
 ## Requirements

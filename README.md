@@ -1,6 +1,6 @@
 # Hardware Monitor
 
-Live hardware stats: CPU/GPU temperatures (°F), utilization, memory, storage, network, and optional llama.cpp inference stats.
+Live hardware stats: CPU/GPU temperatures (°F), utilization, memory, storage, network, top processes, and optional llama.cpp inference stats.
 
 This repo contains **three related things**. They are easy to mix up:
 
