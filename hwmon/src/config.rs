@@ -51,7 +51,7 @@ impl Config {
 use clap::Parser;
 
 #[derive(Parser, Debug)]
-#[command(name = "hwmon", about = "Windows hardware monitor TUI")]
+#[command(name = "hwmon", about = "Cross-platform hardware monitor TUI (Windows + Linux)")]
 struct Cli {
     /// Dashboard refresh interval in seconds
     #[arg(short, long, default_value_t = 1.0)]
