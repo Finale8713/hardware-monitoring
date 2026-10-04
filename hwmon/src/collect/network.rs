@@ -198,6 +198,7 @@ fn first_ipv4(v: &wmi::Variant) -> Option<String> {
     }
 }
 
+#[cfg(windows)]
 fn parse_ipv4(s: &str) -> Option<String> {
     if s.contains('.') && !s.starts_with("169.254") && !s.starts_with("127.") {
         Some(s.to_string())

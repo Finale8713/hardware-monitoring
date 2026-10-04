@@ -219,10 +219,12 @@ fn read_disk_io_top() -> Vec<TopProcess> {
     Vec::new()
 }
 
+#[cfg(windows)]
 fn process_perf_name(name: &str) -> String {
     name.split('#').next().unwrap_or(name).to_string()
 }
 
+#[cfg(windows)]
 fn io_total_bps(detail: &str) -> f64 {
     detail
         .split_whitespace()
@@ -230,6 +232,7 @@ fn io_total_bps(detail: &str) -> f64 {
         .sum()
 }
 
+#[cfg(windows)]
 fn parse_rate_token(s: &str) -> Option<f64> {
     if s.ends_with("MB/s") {
         s.trim_end_matches("MB/s")
@@ -248,6 +251,7 @@ fn parse_rate_token(s: &str) -> Option<f64> {
     }
 }
 
+#[cfg(windows)]
 fn format_rate(bps: f64) -> String {
     if bps >= 1_000_000.0 {
         format!("{:.1} MB/s", bps / 1_000_000.0)

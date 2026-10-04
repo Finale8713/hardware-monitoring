@@ -1,7 +1,9 @@
 use crate::sample::CpuTemp;
 
+#[cfg(windows)]
 const LHM_HTTP_URL: &str = "http://127.0.0.1:8085/data.json";
 
+#[cfg(windows)]
 const CPU_TEMP_HELP: &str = "CPU temp needs either:\n\
   A) LibreHardwareMonitor → Options → Remote Web Server → check Run (verify http://127.0.0.1:8085/data.json in a browser)\n\
   B) Run hwmon from an elevated PowerShell (uses LibreHardwareMonitorLib like the PowerShell monitor)";
@@ -354,6 +356,7 @@ fn parse_lhm_temp_celsius(node: &serde_json::Value) -> Option<f64> {
     None
 }
 
+#[cfg(windows)]
 fn parse_celsius_from_display(s: &str) -> Option<f64> {
     let num: String = s
         .chars()
@@ -365,6 +368,7 @@ fn parse_celsius_from_display(s: &str) -> Option<f64> {
     num.parse().ok().filter(|&v| v > 0.0)
 }
 
+#[cfg(windows)]
 fn parse_cpu_temp_rows<I>(rows: I) -> Vec<CpuTemp>
 where
     I: Iterator<Item = (String, f64)>,
@@ -386,6 +390,7 @@ where
     temps
 }
 
+#[cfg(windows)]
 fn is_cpu_temp_name(name: &str) -> bool {
     name.contains("CPU Package")
         || name.contains("Core (Tctl/Tdie)")
@@ -449,6 +454,7 @@ fn parse_lhm_power_watts(node: &serde_json::Value) -> Option<f64> {
     None
 }
 
+#[cfg(windows)]
 fn parse_watts_from_display(s: &str) -> Option<f64> {
     let num: String = s
         .chars()

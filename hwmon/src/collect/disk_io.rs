@@ -175,6 +175,7 @@ fn mount_points_to_devices(drives: &[String]) -> HashMap<String, String> {
     map
 }
 
+#[cfg(windows)]
 fn normalize_drive_key(drive: &str) -> String {
     let trimmed = drive.trim().trim_end_matches('\\');
     if trimmed.len() >= 2 && trimmed.as_bytes()[1] == b':' {
