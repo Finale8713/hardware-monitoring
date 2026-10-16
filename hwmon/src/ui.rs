@@ -7,7 +7,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Cell, List, ListItem, Paragraph, Row, Table};
 use ratatui::Frame;
 
-pub fn draw(frame: &mut Frame, snap: &Snapshot, cfg: &Config) {
+pub fn draw(frame: &mut Frame, snap: &Snapshot, cfg: &Config, log_error: Option<&str>) {
     let unit = temp_unit(cfg.fahrenheit);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -90,12 +90,13 @@ pub fn draw(frame: &mut Frame, snap: &Snapshot, cfg: &Config) {
     frame.render_widget(storage_list(snap), storage_area);
     frame.render_widget(network_list(snap), net_area);
 
-    let footer = Paragraph::new(format!(
-        " updated {}  |  CSV: {}",
-        snap.at.format("%H:%M:%S"),
-        cfg.log_path.display()
-    ))
-    .style(Style::default().fg(Color::DarkGray))
+    let csv = match log_error {
+        Some(e) => format!("CSV ERROR: {e}"),
+        None => format!("CSV: {}", cfg.log_path.display()),
+    };
+    let footer_color = if log_error.is_some() { Color::Red } else { Color::DarkGray };
+    let footer = Paragraph::new(format!(" updated {}  |  {csv}", snap.at.format("%H:%M:%S")))
+    .style(Style::default().fg(footer_color))
     .block(Block::default().borders(Borders::ALL).title(" Status "));
     frame.render_widget(footer, chunks[2]);
 }
@@ -173,7 +174,8 @@ fn gpu_block(snap: &Snapshot, unit: &str, fahrenheit: bool) -> Paragraph<'static
 }
 
 fn gpu_lines(g: &crate::sample::GpuSnapshot, unit: &str, fahrenheit: bool) -> Vec<Line<'static>> {
-    let temp = c_to_display(g.temp_c, fahrenheit);
+    let na = crate::opt;
+    let temp = na(g.temp_c.map(|c| c_to_display(c, fahrenheit)), 1);
     let vram_pct = if g.vram_total_mib > 0 {
         100.0 * g.vram_used_mib as f64 / g.vram_total_mib as f64
     } else {
@@ -194,19 +196,19 @@ fn gpu_lines(g: &crate::sample::GpuSnapshot, unit: &str, fahrenheit: bool) -> Ve
     };
     vec![
         Line::from(format!(" {:<24}", g.name)),
-        metric_line("temp", &format!("{temp:>5.1} {unit}"), thresholds::gpu_temp_c(g.temp_c)),
+        metric_line("temp", &format!("{temp:>5} {unit}"), thresholds::gpu_temp_c(g.temp_c.unwrap_or(0.0))),
         metric_line(
             "compute",
-            &format!("{:.0}%", g.compute_util),
-            thresholds::pct_util(g.compute_util),
+            &format!("{}%", na(g.compute_util, 0)),
+            thresholds::pct_util(g.compute_util.unwrap_or(0.0)),
         ),
         metric_line(
             "vram",
             &format!("{vram_pct:.1}%  ({vram_used_txt} / {vram_total_txt})"),
             thresholds::pct_used(vram_pct),
         ),
-        Line::from(format!(" core clock   {} MHz", g.core_mhz)),
-        Line::from(format!(" power        {:.1} W", g.power_w)),
+        Line::from(format!(" core clock   {} MHz", na(g.core_mhz, 0))),
+        Line::from(format!(" power        {} W", na(g.power_w, 1))),
     ]
 }
 

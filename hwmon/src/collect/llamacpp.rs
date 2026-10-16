@@ -48,8 +48,7 @@ pub fn sample(
 
 fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
-        .timeout_connect(Duration::from_millis(400))
-        .timeout_read(Duration::from_millis(700))
+        .timeout(Duration::from_millis(500))
         .build()
 }
 

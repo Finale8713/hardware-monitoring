@@ -72,7 +72,7 @@ impl Collector {
         let swap_used = self.sys.used_swap() as f64 / (1024.0 * 1024.0 * 1024.0);
         let swap_total = self.sys.total_swap() as f64 / (1024.0 * 1024.0 * 1024.0);
         self.tick = self.tick.wrapping_add(1);
-        let process_snip = if self.tick % 2 == 0 {
+        let process_snip = if self.tick.is_multiple_of(2) {
             let mem_total_bytes = self.sys.total_memory();
             let num_cpus = self.sys.cpus().len().max(1);
             let snip = processes::sample(&mut self.sys, mem_total_bytes, num_cpus);
