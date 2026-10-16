@@ -7,14 +7,30 @@ pub struct CpuTemp {
     pub source: String,
 }
 
-#[derive(Clone, Debug, Default)]
+/// Where a GPU reading came from. Also the CSV `Source` column.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GpuSource {
+    #[default]
+    NvidiaSmi,
+}
+
+impl GpuSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            GpuSource::NvidiaSmi => "nvidia-smi",
+        }
+    }
+}
+
+/// One GPU reading, from any source. `None` means the source did not report it.
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct GpuSnapshot {
+    pub source: GpuSource,
     pub name: String,
-    /// `None` when nvidia-smi reports `[N/A]` or an unparsable value.
     pub temp_c: Option<f64>,
     pub compute_util: Option<f64>,
-    pub vram_used_mib: u64,
-    pub vram_total_mib: u64,
+    pub vram_used_mib: Option<u64>,
+    pub vram_total_mib: Option<u64>,
     pub power_w: Option<f64>,
     pub core_mhz: Option<f64>,
 }

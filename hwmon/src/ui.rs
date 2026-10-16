@@ -159,7 +159,7 @@ fn gpu_block(snap: &Snapshot, unit: &str, fahrenheit: bool) -> Paragraph<'static
     let mut lines = Vec::new();
     if snap.gpus.is_empty() {
         lines.push(Line::from(Span::styled(
-            " no GPU data (nvidia-smi)",
+            " no GPU data (nvidia-smi, amdgpu)",
             Style::default().fg(Color::Yellow),
         )));
     } else {
@@ -176,23 +176,14 @@ fn gpu_block(snap: &Snapshot, unit: &str, fahrenheit: bool) -> Paragraph<'static
 fn gpu_lines(g: &crate::sample::GpuSnapshot, unit: &str, fahrenheit: bool) -> Vec<Line<'static>> {
     let na = crate::opt;
     let temp = na(g.temp_c.map(|c| c_to_display(c, fahrenheit)), 1);
-    let vram_pct = if g.vram_total_mib > 0 {
-        100.0 * g.vram_used_mib as f64 / g.vram_total_mib as f64
-    } else {
-        0.0
+    let vram = match (g.vram_used_mib, g.vram_total_mib) {
+        (Some(used), Some(total)) if total > 0 => Some((used, total)),
+        _ => None,
     };
-    let vram_used_gb = g.vram_used_mib as f64 / 1024.0;
-    let vram_total_gb = g.vram_total_mib as f64 / 1024.0;
-    // Show MiB below 1 GiB so an idle GPU reads as "4 MiB", not "0.0 GB".
-    let vram_used_txt = if g.vram_used_mib < 1024 {
-        format!("{} MiB", g.vram_used_mib)
-    } else {
-        format!("{vram_used_gb:.1} GB")
-    };
-    let vram_total_txt = if g.vram_total_mib < 1024 {
-        format!("{} MiB", g.vram_total_mib)
-    } else {
-        format!("{vram_total_gb:.1} GB")
+    let vram_pct = vram.map(|(u, t)| 100.0 * u as f64 / t as f64);
+    let vram_txt = match vram {
+        Some((used, total)) => format!("{:.1}%  ({} / {})", vram_pct.unwrap_or(0.0), mib_txt(used), mib_txt(total)),
+        None => "n/a".into(),
     };
     vec![
         Line::from(format!(" {:<24}", g.name)),
@@ -204,12 +195,21 @@ fn gpu_lines(g: &crate::sample::GpuSnapshot, unit: &str, fahrenheit: bool) -> Ve
         ),
         metric_line(
             "vram",
-            &format!("{vram_pct:.1}%  ({vram_used_txt} / {vram_total_txt})"),
-            thresholds::pct_used(vram_pct),
+            &vram_txt,
+            thresholds::pct_used(vram_pct.unwrap_or(0.0)),
         ),
         Line::from(format!(" core clock   {} MHz", na(g.core_mhz, 0))),
         Line::from(format!(" power        {} W", na(g.power_w, 1))),
     ]
+}
+
+/// MiB below 1 GiB so an idle GPU reads as "4 MiB", not "0.0 GB".
+fn mib_txt(mib: u64) -> String {
+    if mib < 1024 {
+        format!("{mib} MiB")
+    } else {
+        format!("{:.1} GB", mib as f64 / 1024.0)
+    }
 }
 
 fn memory_block(snap: &Snapshot) -> Paragraph<'static> {

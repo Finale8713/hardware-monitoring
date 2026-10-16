@@ -1,4 +1,4 @@
-use crate::sample::GpuSnapshot;
+use crate::sample::{GpuSnapshot, GpuSource};
 use anyhow::Context;
 use std::process::Command;
 
@@ -38,9 +38,10 @@ fn parse_gpu_line(line: &str) -> Option<GpuSnapshot> {
     }
     // "[N/A]", "[Not Supported]", etc. fail to parse and become None.
     let num = |s: &str| s.parse::<f64>().ok().filter(|v| v.is_finite());
-    let mib = |s: &str| s.parse::<u64>().unwrap_or(0);
+    let mib = |s: &str| s.parse::<u64>().ok();
 
     Some(GpuSnapshot {
+        source: GpuSource::NvidiaSmi,
         name: format!("GPU{} {}", p[0], p[7]),
         temp_c: num(p[1]),
         compute_util: num(p[2]),
@@ -61,7 +62,7 @@ mod tests {
         assert_eq!(g.name, "GPU0 NVIDIA GeForce GTX 1660 Ti");
         assert_eq!(g.temp_c, Some(52.0));
         assert_eq!(g.compute_util, Some(7.0));
-        assert_eq!((g.vram_used_mib, g.vram_total_mib), (512, 6144));
+        assert_eq!((g.vram_used_mib, g.vram_total_mib), (Some(512), Some(6144)));
         assert_eq!(g.power_w, Some(18.34));
         assert_eq!(g.core_mhz, Some(1395.0));
     }

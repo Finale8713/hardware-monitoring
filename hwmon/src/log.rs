@@ -104,13 +104,13 @@ fn rows(snap: &Snapshot, fahrenheit: bool) -> Vec<String> {
     }
     for g in &snap.gpus {
         out.push(row(
-            "nvidia-smi",
+            g.source.as_str(),
             &g.name,
             g.temp_c,
             g.compute_util,
             g.power_w,
-            Some(g.vram_used_mib as f64 / 1024.0),
-            Some(g.vram_total_mib as f64 / 1024.0),
+            g.vram_used_mib.map(|m| m as f64 / 1024.0),
+            g.vram_total_mib.map(|m| m as f64 / 1024.0),
         ));
     }
     out.push(row("system", "RAM", None, Some(snap.mem_used_pct), None, Some(snap.mem_used_gb), Some(snap.mem_total_gb)));
