@@ -17,4 +17,5 @@ foreach ($t in [HwMonitorLhmReader]::GetTemperaturesC()) {
     if ($out.Count -ge 3) { break }
 }
 
-$out | ConvertTo-Json -Compress
+# -InputObject @() keeps a JSON array even with exactly one sensor (hwmon parses a list).
+ConvertTo-Json -InputObject @($out) -Compress

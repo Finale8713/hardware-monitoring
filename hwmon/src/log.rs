@@ -106,9 +106,9 @@ fn rows(snap: &Snapshot, fahrenheit: bool) -> Vec<String> {
         out.push(row(
             "nvidia-smi",
             &g.name,
-            Some(g.temp_c),
-            Some(g.compute_util),
-            Some(g.power_w),
+            g.temp_c,
+            g.compute_util,
+            g.power_w,
             Some(g.vram_used_mib as f64 / 1024.0),
             Some(g.vram_total_mib as f64 / 1024.0),
         ));

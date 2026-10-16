@@ -10,12 +10,13 @@ pub struct CpuTemp {
 #[derive(Clone, Debug, Default)]
 pub struct GpuSnapshot {
     pub name: String,
-    pub temp_c: f64,
-    pub compute_util: f64,
+    /// `None` when nvidia-smi reports `[N/A]` or an unparsable value.
+    pub temp_c: Option<f64>,
+    pub compute_util: Option<f64>,
     pub vram_used_mib: u64,
     pub vram_total_mib: u64,
-    pub power_w: f64,
-    pub core_mhz: u64,
+    pub power_w: Option<f64>,
+    pub core_mhz: Option<f64>,
 }
 
 #[derive(Clone, Debug)]
@@ -48,7 +49,7 @@ impl PowerEstimate {
         psu_watts: f64,
         overhead_w: f64,
     ) -> Self {
-        let gpu_total_w: f64 = gpus.iter().map(|g| g.power_w).sum();
+        let gpu_total_w: f64 = gpus.iter().filter_map(|g| g.power_w).sum();
         let cpu_used = cpu_w.unwrap_or(0.0);
         let total_w = gpu_total_w + cpu_used + overhead_w;
         let pct_of_psu = if psu_watts > 0.0 {

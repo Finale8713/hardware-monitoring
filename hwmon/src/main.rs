@@ -40,6 +40,11 @@ fn main() -> Result<()> {
     run_tui(&cfg, &mut collector, &mut logger, &mut snap)
 }
 
+/// Format a reading that may be unknown (nvidia-smi `[N/A]`) as "?".
+pub fn opt(v: Option<f64>, decimals: usize) -> String {
+    v.map(|v| format!("{v:.decimals$}")).unwrap_or_else(|| "?".into())
+}
+
 fn print_snapshot(snap: &sample::Snapshot, cfg: &Config) {
     let unit = config::temp_unit(cfg.fahrenheit);
     println!("CPU  util {:.1}%", snap.cpu_util);
@@ -60,12 +65,12 @@ fn print_snapshot(snap: &sample::Snapshot, cfg: &Config) {
     }
     for g in &snap.gpus {
         println!(
-            "GPU  {} {:.1} {} compute {:.0}%  {:.1} W",
+            "GPU  {} {} {} compute {}%  {} W",
             g.name,
-            config::c_to_display(g.temp_c, cfg.fahrenheit),
+            opt(g.temp_c.map(|c| config::c_to_display(c, cfg.fahrenheit)), 1),
             unit,
-            g.compute_util,
-            g.power_w
+            opt(g.compute_util, 0),
+            opt(g.power_w, 1)
         );
     }
     let p = &snap.power;
