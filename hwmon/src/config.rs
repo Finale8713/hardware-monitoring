@@ -50,6 +50,11 @@ impl Config {
 
 use clap::Parser;
 
+#[cfg(windows)]
+const DEFAULT_LOG_PATH: &str = r"C:\Logs\hardware-temps.csv";
+#[cfg(not(windows))]
+const DEFAULT_LOG_PATH: &str = "/tmp/hwmon/hardware-temps.csv";
+
 #[derive(Parser, Debug)]
 #[command(name = "hwmon", about = "Cross-platform hardware monitor TUI (Windows + Linux)")]
 struct Cli {
@@ -62,7 +67,7 @@ struct Cli {
     log_every: u64,
 
     /// CSV log file path
-    #[arg(long, default_value = r"C:\Logs\hardware-temps.csv")]
+    #[arg(long, default_value = DEFAULT_LOG_PATH)]
     log_path: String,
 
     /// Sample once and exit (no TUI loop)
