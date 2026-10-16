@@ -68,7 +68,8 @@ impl PowerEstimate {
         psu_watts: f64,
         overhead_w: f64,
     ) -> Self {
-        let gpu_total_w: f64 = gpus.iter().filter_map(|g| g.power_w).sum();
+        // fold from +0.0: an empty float `sum()` is -0.0 and prints as "-0".
+        let gpu_total_w = gpus.iter().filter_map(|g| g.power_w).fold(0.0, |a, w| a + w);
         let cpu_used = cpu_w.unwrap_or(0.0);
         let total_w = gpu_total_w + cpu_used + overhead_w;
         let pct_of_psu = if psu_watts > 0.0 {
@@ -196,5 +197,11 @@ mod tests {
         assert_eq!(p.gpu_total_w, 25.0);
         assert_eq!(p.total_w, 50.0);
         assert_eq!(p.pct_of_psu, 25.0);
+    }
+
+    #[test]
+    fn no_gpus_prints_as_zero_watts() {
+        let p = PowerEstimate::compute(&[], None, 850.0, 100.0);
+        assert_eq!(format!("{:.0}", p.gpu_total_w), "0");
     }
 }
