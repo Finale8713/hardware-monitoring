@@ -124,7 +124,7 @@ fn rows(snap: &Snapshot, fahrenheit: bool) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sample::{CpuTemp, DiskSnapshot, GpuSnapshot};
+    use crate::sample::{CpuTemp, DiskSnapshot, GpuSnapshot, GpuSource};
 
     /// Count CSV fields, respecting double-quoted fields.
     fn field_count(line: &str) -> usize {
@@ -144,7 +144,10 @@ mod tests {
     fn every_row_matches_header_field_count() {
         let snap = Snapshot {
             cpu_temps: vec![CpuTemp { name: "Tctl, die".into(), celsius: 60.0, source: "Linux-hwmon".into() }],
-            gpus: vec![GpuSnapshot { name: "GPU0 \"Weird, Name\"".into(), ..Default::default() }],
+            gpus: vec![
+                GpuSnapshot { name: "GPU0 \"Weird, Name\"".into(), ..Default::default() },
+                GpuSnapshot { source: GpuSource::Amdgpu, name: "amdgpu (card0)".into(), temp_c: Some(45.0), ..Default::default() },
+            ],
             disks: vec![DiskSnapshot { drive: "/".into(), ..Default::default() }],
             ..Default::default()
         };
