@@ -25,7 +25,7 @@ pub fn sample(networks: &Networks) -> (Vec<NetSnapshot>, NetSummary) {
     let mut current = HashMap::new();
 
     for (name, data) in networks.iter() {
-        if should_skip_adapter(&name) {
+        if should_skip_adapter(name) {
             continue;
         }
         if data.total_received() == 0

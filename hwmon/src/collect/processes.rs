@@ -41,7 +41,7 @@ pub fn sample(sys: &mut System, mem_total_bytes: u64, num_cpus: usize) -> Proces
     let mut by_cpu = procs.clone();
     by_cpu.sort_by(|a, b| b.cpu_pct.partial_cmp(&a.cpu_pct).unwrap_or(Ordering::Equal));
     let mut by_mem = procs.clone();
-    by_mem.sort_by(|a, b| b.mem_bytes.cmp(&a.mem_bytes));
+    by_mem.sort_by_key(|r| std::cmp::Reverse(r.mem_bytes));
     let mut keep: HashSet<u32> = HashSet::new();
     keep.extend(by_cpu.iter().take(TOP_N).map(|r| r.pid));
     keep.extend(by_mem.iter().take(TOP_N).map(|r| r.pid));
