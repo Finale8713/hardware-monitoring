@@ -35,7 +35,7 @@ impl CsvLogger {
         Ok(())
     }
 
-    fn ensure_writer(&mut self) -> anyhow::Result<&mut BufWriter<File>> {
+    fn ensure_writer(&mut self, fahrenheit: bool) -> anyhow::Result<&mut BufWriter<File>> {
         if self.writer.is_none() {
             if let Some(parent) = self.path.parent() {
                 if !parent.as_os_str().is_empty() {
@@ -51,10 +51,7 @@ impl CsvLogger {
                 .with_context(|| format!("open log {}", self.path.display()))?;
             let mut w = BufWriter::new(file);
             if new_file {
-                writeln!(
-                    w,
-                    "Timestamp,Source,Device,SensorF,UtilPct,PowerW,MemUtilPct,Alert"
-                )?;
+                writeln!(w, "{}", header(fahrenheit))?;
             }
             self.writer = Some(w);
         }
@@ -62,64 +59,106 @@ impl CsvLogger {
     }
 
     fn write_snapshot(&mut self, snap: &Snapshot, fahrenheit: bool) -> anyhow::Result<()> {
-        let w = self.ensure_writer()?;
-        let ts = snap.at.to_rfc3339();
-
-        writeln!(
-            w,
-            "{ts},perf-counter,CPU Total,,{:.1},,",
-            snap.cpu_util
-        )?;
-
-        for t in &snap.cpu_temps {
-            let temp = c_to_display(t.celsius, fahrenheit);
-            writeln!(
-                w,
-                "{ts},{},\"{}\",{temp:.1},,,",
-                t.source,
-                t.name.replace(',', ";")
-            )?;
+        let w = self.ensure_writer(fahrenheit)?;
+        for row in rows(snap, fahrenheit) {
+            writeln!(w, "{row}")?;
         }
-
-        for g in &snap.gpus {
-            let temp = c_to_display(g.temp_c, fahrenheit);
-            let vram_pct = if g.vram_total_mib > 0 {
-                100.0 * g.vram_used_mib as f64 / g.vram_total_mib as f64
-            } else {
-                0.0
-            };
-            writeln!(
-                w,
-                "{ts},nvidia-smi,\"{}\",{temp:.1},{:.0},{:.1},{vram_pct:.1},",
-                g.name.replace(',', ";"),
-                g.compute_util,
-                g.power_w
-            )?;
-        }
-
-        writeln!(
-            w,
-            "{ts},system,RAM,,{:.1},{:.1},{:.1},",
-            snap.mem_used_pct, snap.mem_used_gb, snap.mem_total_gb
-        )?;
-
-        for d in &snap.disks {
-            writeln!(
-                w,
-                "{ts},system,\"Disk {}\",,{:.1},{:.1},{:.1},",
-                d.drive, d.used_pct, d.used_gb, d.total_gb
-            )?;
-        }
-
-        writeln!(
-            w,
-            "{ts},estimate,\"PSU total\",,{:.1},{:.1},{:.1},",
-            snap.power.pct_of_psu,
-            snap.power.total_w,
-            snap.power.psu_watts
-        )?;
-
         w.flush()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+const COLUMNS: usize = 8;
+
+fn header(fahrenheit: bool) -> String {
+    let temp = if fahrenheit { "TempF" } else { "TempC" };
+    format!("Timestamp,Source,Device,{temp},UtilPct,PowerW,UsedGB,TotalGB")
+}
+
+fn quote(s: &str) -> String {
+    format!("\"{}\"", s.replace('"', "\"\""))
+}
+
+fn opt(v: Option<f64>) -> String {
+    v.map(|v| format!("{v:.1}")).unwrap_or_default()
+}
+
+/// One CSV line per metric, always `COLUMNS` fields. Empty field = not applicable.
+fn rows(snap: &Snapshot, fahrenheit: bool) -> Vec<String> {
+    let ts = snap.at.to_rfc3339();
+    let row = |source: &str, device: &str, temp: Option<f64>, util: Option<f64>, power: Option<f64>, used: Option<f64>, total: Option<f64>| {
+        format!(
+            "{ts},{source},{},{},{},{},{},{}",
+            quote(device),
+            opt(temp.map(|c| c_to_display(c, fahrenheit))),
+            opt(util),
+            opt(power),
+            opt(used),
+            opt(total)
+        )
+    };
+    let mut out = vec![row("sysinfo", "CPU Total", None, Some(snap.cpu_util), snap.power.cpu_w, None, None)];
+    for t in &snap.cpu_temps {
+        out.push(row(&t.source, &t.name, Some(t.celsius), None, None, None, None));
+    }
+    for g in &snap.gpus {
+        out.push(row(
+            "nvidia-smi",
+            &g.name,
+            Some(g.temp_c),
+            Some(g.compute_util),
+            Some(g.power_w),
+            Some(g.vram_used_mib as f64 / 1024.0),
+            Some(g.vram_total_mib as f64 / 1024.0),
+        ));
+    }
+    out.push(row("system", "RAM", None, Some(snap.mem_used_pct), None, Some(snap.mem_used_gb), Some(snap.mem_total_gb)));
+    for d in &snap.disks {
+        out.push(row("system", &format!("Disk {}", d.drive), None, Some(d.used_pct), None, Some(d.used_gb), Some(d.total_gb)));
+    }
+    out.push(row("estimate", "PSU total", None, Some(snap.power.pct_of_psu), Some(snap.power.total_w), None, Some(snap.power.psu_watts)));
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sample::{CpuTemp, DiskSnapshot, GpuSnapshot};
+
+    /// Count CSV fields, respecting double-quoted fields.
+    fn field_count(line: &str) -> usize {
+        let mut n = 1;
+        let mut in_q = false;
+        for c in line.chars() {
+            match c {
+                '"' => in_q = !in_q,
+                ',' if !in_q => n += 1,
+                _ => {}
+            }
+        }
+        n
+    }
+
+    #[test]
+    fn every_row_matches_header_field_count() {
+        let snap = Snapshot {
+            cpu_temps: vec![CpuTemp { name: "Tctl, die".into(), celsius: 60.0, source: "Linux-hwmon".into() }],
+            gpus: vec![GpuSnapshot { name: "GPU0 \"Weird, Name\"".into(), ..Default::default() }],
+            disks: vec![DiskSnapshot { drive: "/".into(), ..Default::default() }],
+            ..Default::default()
+        };
+        for f in [true, false] {
+            assert_eq!(field_count(&header(f)), COLUMNS);
+            for r in rows(&snap, f) {
+                assert_eq!(field_count(&r), COLUMNS, "{r}");
+            }
+        }
+    }
+
+    #[test]
+    fn header_honors_unit() {
+        assert!(header(true).contains("TempF"));
+        assert!(header(false).contains("TempC"));
     }
 }
