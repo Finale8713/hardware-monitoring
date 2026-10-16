@@ -8,29 +8,37 @@ const CPU_TEMP_HELP: &str = "CPU temp needs either:\n\
   A) LibreHardwareMonitor → Options → Remote Web Server → check Run (verify http://127.0.0.1:8085/data.json in a browser)\n\
   B) Run hwmon from an elevated PowerShell (uses LibreHardwareMonitorLib like the PowerShell monitor)";
 
+/// Which Windows temp source last worked (0 = none yet), so each tick tries it
+/// first instead of walking the slow HTTP -> WMI -> PowerShell chain.
+#[cfg(windows)]
+static WORKING_SOURCE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
 #[cfg(windows)]
 pub fn read_cpu_sensors() -> (Vec<CpuTemp>, Option<f64>, Option<String>) {
-    if let Ok(json) = fetch_lhm_json() {
-        let mut temps = Vec::new();
-        collect_temps_from_json(&json, &mut temps);
-        let power = find_cpu_package_power(&json);
+    use std::sync::atomic::Ordering::Relaxed;
+
+    let cached = WORKING_SOURCE.load(Relaxed);
+    let order: &[u8] = if cached == 0 { &[1, 2, 3] } else { &[cached, 1, 2, 3] };
+    for &src in order {
+        let (temps, power) = match src {
+            1 => match fetch_lhm_json() {
+                Ok(json) => {
+                    let mut temps = Vec::new();
+                    collect_temps_from_json(&json, &mut temps);
+                    (temps, find_cpu_package_power(&json))
+                }
+                Err(_) => continue,
+            },
+            2 => (read_lhm_temps_wmi().unwrap_or_default(), None),
+            _ => (read_lhm_temps_powershell().unwrap_or_default(), None),
+        };
         if !temps.is_empty() {
+            WORKING_SOURCE.store(src, Relaxed);
             return (temps, power, None);
         }
     }
 
-    if let Ok(temps) = read_lhm_temps_wmi() {
-        if !temps.is_empty() {
-            return (temps, None, None);
-        }
-    }
-
-    if let Ok(temps) = read_lhm_temps_powershell() {
-        if !temps.is_empty() {
-            return (temps, None, None);
-        }
-    }
-
+    WORKING_SOURCE.store(0, Relaxed);
     (vec![], None, Some(CPU_TEMP_HELP.into()))
 }
 
@@ -194,7 +202,10 @@ fn is_cpu_hwmon_name(name: &str) -> bool {
 
 #[cfg(windows)]
 fn fetch_lhm_json() -> anyhow::Result<serde_json::Value> {
-    let body = ureq::get(LHM_HTTP_URL)
+    let body = ureq::AgentBuilder::new()
+        .timeout(std::time::Duration::from_millis(500))
+        .build()
+        .get(LHM_HTTP_URL)
         .call()
         .map_err(|e| anyhow::anyhow!("{e}"))?
         .into_string()?;
