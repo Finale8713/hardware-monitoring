@@ -12,12 +12,15 @@ pub struct CpuTemp {
 pub enum GpuSource {
     #[default]
     NvidiaSmi,
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    Amdgpu,
 }
 
 impl GpuSource {
     pub fn as_str(self) -> &'static str {
         match self {
             GpuSource::NvidiaSmi => "nvidia-smi",
+            GpuSource::Amdgpu => "amdgpu",
         }
     }
 }
@@ -176,4 +179,22 @@ pub struct Snapshot {
     pub net_summary: NetSummary,
     pub processes: ProcessSnip,
     pub llama: Option<LlamaSnapshot>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn psu_estimate_sums_power_from_every_gpu_source() {
+        let gpus = [
+            GpuSnapshot { source: GpuSource::NvidiaSmi, power_w: Some(20.0), ..Default::default() },
+            GpuSnapshot { source: GpuSource::Amdgpu, power_w: Some(5.0), ..Default::default() },
+            GpuSnapshot { source: GpuSource::Amdgpu, power_w: None, ..Default::default() },
+        ];
+        let p = PowerEstimate::compute(&gpus, Some(15.0), 200.0, 10.0);
+        assert_eq!(p.gpu_total_w, 25.0);
+        assert_eq!(p.total_w, 50.0);
+        assert_eq!(p.pct_of_psu, 25.0);
+    }
 }
