@@ -65,7 +65,8 @@ fn print_snapshot(snap: &sample::Snapshot, cfg: &Config) {
     }
     for g in &snap.gpus {
         println!(
-            "GPU  {} {} {} compute {}%  {} W",
+            "GPU  [{}] {} {} {} compute {}%  {} W",
+            g.source.as_str(),
             g.name,
             opt(g.temp_c.map(|c| config::c_to_display(c, cfg.fahrenheit)), 1),
             unit,

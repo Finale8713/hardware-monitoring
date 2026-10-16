@@ -1,3 +1,5 @@
+#[cfg(target_os = "linux")]
+mod amdgpu;
 mod cpu;
 mod disk_io;
 mod gpu;
@@ -52,7 +54,10 @@ impl Collector {
         self.networks.refresh(false);
 
         let (cpu_temps, cpu_power_w, cpu_note) = cpu::read_cpu_sensors();
-        let gpus = gpu::read_gpus().unwrap_or_default();
+        #[cfg_attr(not(target_os = "linux"), allow(unused_mut))]
+        let mut gpus = gpu::read_gpus().unwrap_or_default();
+        #[cfg(target_os = "linux")]
+        gpus.extend(amdgpu::read_gpus(std::path::Path::new("/sys/class/drm")));
         let power = PowerEstimate::compute(
             &gpus,
             cpu_power_w,

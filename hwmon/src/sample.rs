@@ -7,14 +7,33 @@ pub struct CpuTemp {
     pub source: String,
 }
 
-#[derive(Clone, Debug, Default)]
+/// Where a GPU reading came from. Also the CSV `Source` column.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GpuSource {
+    #[default]
+    NvidiaSmi,
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    Amdgpu,
+}
+
+impl GpuSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            GpuSource::NvidiaSmi => "nvidia-smi",
+            GpuSource::Amdgpu => "amdgpu",
+        }
+    }
+}
+
+/// One GPU reading, from any source. `None` means the source did not report it.
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct GpuSnapshot {
+    pub source: GpuSource,
     pub name: String,
-    /// `None` when nvidia-smi reports `[N/A]` or an unparsable value.
     pub temp_c: Option<f64>,
     pub compute_util: Option<f64>,
-    pub vram_used_mib: u64,
-    pub vram_total_mib: u64,
+    pub vram_used_mib: Option<u64>,
+    pub vram_total_mib: Option<u64>,
     pub power_w: Option<f64>,
     pub core_mhz: Option<f64>,
 }
@@ -49,7 +68,8 @@ impl PowerEstimate {
         psu_watts: f64,
         overhead_w: f64,
     ) -> Self {
-        let gpu_total_w: f64 = gpus.iter().filter_map(|g| g.power_w).sum();
+        // fold from +0.0: an empty float `sum()` is -0.0 and prints as "-0".
+        let gpu_total_w = gpus.iter().filter_map(|g| g.power_w).fold(0.0, |a, w| a + w);
         let cpu_used = cpu_w.unwrap_or(0.0);
         let total_w = gpu_total_w + cpu_used + overhead_w;
         let pct_of_psu = if psu_watts > 0.0 {
@@ -160,4 +180,28 @@ pub struct Snapshot {
     pub net_summary: NetSummary,
     pub processes: ProcessSnip,
     pub llama: Option<LlamaSnapshot>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn psu_estimate_sums_power_from_every_gpu_source() {
+        let gpus = [
+            GpuSnapshot { source: GpuSource::NvidiaSmi, power_w: Some(20.0), ..Default::default() },
+            GpuSnapshot { source: GpuSource::Amdgpu, power_w: Some(5.0), ..Default::default() },
+            GpuSnapshot { source: GpuSource::Amdgpu, power_w: None, ..Default::default() },
+        ];
+        let p = PowerEstimate::compute(&gpus, Some(15.0), 200.0, 10.0);
+        assert_eq!(p.gpu_total_w, 25.0);
+        assert_eq!(p.total_w, 50.0);
+        assert_eq!(p.pct_of_psu, 25.0);
+    }
+
+    #[test]
+    fn no_gpus_prints_as_zero_watts() {
+        let p = PowerEstimate::compute(&[], None, 850.0, 100.0);
+        assert_eq!(format!("{:.0}", p.gpu_total_w), "0");
+    }
 }

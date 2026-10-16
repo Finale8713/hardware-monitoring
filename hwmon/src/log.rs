@@ -104,13 +104,13 @@ fn rows(snap: &Snapshot, fahrenheit: bool) -> Vec<String> {
     }
     for g in &snap.gpus {
         out.push(row(
-            "nvidia-smi",
+            g.source.as_str(),
             &g.name,
             g.temp_c,
             g.compute_util,
             g.power_w,
-            Some(g.vram_used_mib as f64 / 1024.0),
-            Some(g.vram_total_mib as f64 / 1024.0),
+            g.vram_used_mib.map(|m| m as f64 / 1024.0),
+            g.vram_total_mib.map(|m| m as f64 / 1024.0),
         ));
     }
     out.push(row("system", "RAM", None, Some(snap.mem_used_pct), None, Some(snap.mem_used_gb), Some(snap.mem_total_gb)));
@@ -124,7 +124,7 @@ fn rows(snap: &Snapshot, fahrenheit: bool) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sample::{CpuTemp, DiskSnapshot, GpuSnapshot};
+    use crate::sample::{CpuTemp, DiskSnapshot, GpuSnapshot, GpuSource};
 
     /// Count CSV fields, respecting double-quoted fields.
     fn field_count(line: &str) -> usize {
@@ -144,7 +144,10 @@ mod tests {
     fn every_row_matches_header_field_count() {
         let snap = Snapshot {
             cpu_temps: vec![CpuTemp { name: "Tctl, die".into(), celsius: 60.0, source: "Linux-hwmon".into() }],
-            gpus: vec![GpuSnapshot { name: "GPU0 \"Weird, Name\"".into(), ..Default::default() }],
+            gpus: vec![
+                GpuSnapshot { name: "GPU0 \"Weird, Name\"".into(), ..Default::default() },
+                GpuSnapshot { source: GpuSource::Amdgpu, name: "amdgpu (card0)".into(), temp_c: Some(45.0), ..Default::default() },
+            ],
             disks: vec![DiskSnapshot { drive: "/".into(), ..Default::default() }],
             ..Default::default()
         };
