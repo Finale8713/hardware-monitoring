@@ -14,7 +14,7 @@ use crossterm::ExecutableCommand;
 use log::CsvLogger;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
-use std::io::{stdout, Stdout};
+use std::io::stdout;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -33,9 +33,8 @@ fn main() -> Result<()> {
     let mut snap = collector.sample();
 
     if cfg.once {
-        logger.maybe_log(&snap, cfg.fahrenheit)?;
         print_snapshot(&snap, &cfg);
-        return Ok(());
+        return logger.maybe_log(&snap, cfg.fahrenheit);
     }
 
     run_tui(&cfg, &mut collector, &mut logger, &mut snap)
@@ -90,6 +89,17 @@ fn print_snapshot(snap: &sample::Snapshot, cfg: &Config) {
     }
 }
 
+/// Restores the terminal when dropped, so every exit path (error or panic) cleans up.
+struct TerminalGuard;
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        let _ = disable_raw_mode();
+        let _ = stdout().execute(LeaveAlternateScreen);
+        let _ = stdout().execute(crossterm::cursor::Show);
+    }
+}
+
 fn run_tui(
     cfg: &Config,
     collector: &mut Collector,
@@ -97,15 +107,17 @@ fn run_tui(
     snap: &mut sample::Snapshot,
 ) -> Result<()> {
     enable_raw_mode()?;
+    let _guard = TerminalGuard;
     stdout().execute(EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
     let mut last_tick = Instant::now();
     let tick_rate = cfg.refresh;
 
-    logger.maybe_log(snap, cfg.fahrenheit)?;
+    // A failed CSV write is shown in the status bar; it must not stop the monitor.
+    let mut log_error = logger.maybe_log(snap, cfg.fahrenheit).err().map(|e| format!("{e:#}"));
 
     loop {
-        terminal.draw(|f| ui::draw(f, snap, cfg))?;
+        terminal.draw(|f| ui::draw(f, snap, cfg, log_error.as_deref()))?;
 
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
@@ -116,25 +128,15 @@ fn run_tui(
                 if key.kind == KeyEventKind::Press
                     && matches!(key.code, KeyCode::Char('q') | KeyCode::Esc)
                 {
-                    break;
+                    return Ok(());
                 }
             }
         }
 
         if last_tick.elapsed() >= tick_rate {
             *snap = collector.sample();
-            logger.maybe_log(snap, cfg.fahrenheit)?;
+            log_error = logger.maybe_log(snap, cfg.fahrenheit).err().map(|e| format!("{e:#}"));
             last_tick = Instant::now();
         }
     }
-
-    restore_terminal(&mut terminal)?;
-    Ok(())
-}
-
-fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<()> {
-    disable_raw_mode()?;
-    terminal.backend_mut().execute(LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
-    Ok(())
 }

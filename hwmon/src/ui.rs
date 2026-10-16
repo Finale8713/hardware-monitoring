@@ -7,7 +7,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Cell, List, ListItem, Paragraph, Row, Table};
 use ratatui::Frame;
 
-pub fn draw(frame: &mut Frame, snap: &Snapshot, cfg: &Config) {
+pub fn draw(frame: &mut Frame, snap: &Snapshot, cfg: &Config, log_error: Option<&str>) {
     let unit = temp_unit(cfg.fahrenheit);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -90,12 +90,13 @@ pub fn draw(frame: &mut Frame, snap: &Snapshot, cfg: &Config) {
     frame.render_widget(storage_list(snap), storage_area);
     frame.render_widget(network_list(snap), net_area);
 
-    let footer = Paragraph::new(format!(
-        " updated {}  |  CSV: {}",
-        snap.at.format("%H:%M:%S"),
-        cfg.log_path.display()
-    ))
-    .style(Style::default().fg(Color::DarkGray))
+    let csv = match log_error {
+        Some(e) => format!("CSV ERROR: {e}"),
+        None => format!("CSV: {}", cfg.log_path.display()),
+    };
+    let footer_color = if log_error.is_some() { Color::Red } else { Color::DarkGray };
+    let footer = Paragraph::new(format!(" updated {}  |  {csv}", snap.at.format("%H:%M:%S")))
+    .style(Style::default().fg(footer_color))
     .block(Block::default().borders(Borders::ALL).title(" Status "));
     frame.render_widget(footer, chunks[2]);
 }
