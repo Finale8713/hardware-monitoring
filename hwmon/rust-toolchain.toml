@@ -1,0 +1,4 @@
+# Matches Cargo.toml rust-version. Contributors get this toolchain via rustup.
+[toolchain]
+channel = "1.88.0"
+components = ["clippy", "rustfmt"]

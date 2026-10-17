@@ -11,6 +11,7 @@ pub struct CsvLogger {
     every: Duration,
     last: Option<Instant>,
     writer: Option<BufWriter<File>>,
+    disabled: bool,
 }
 
 impl CsvLogger {
@@ -20,10 +21,14 @@ impl CsvLogger {
             every: cfg.log_every,
             last: None,
             writer: None,
+            disabled: cfg.no_log,
         })
     }
 
     pub fn maybe_log(&mut self, snap: &Snapshot, fahrenheit: bool) -> anyhow::Result<()> {
+        if self.disabled {
+            return Ok(());
+        }
         let now = Instant::now();
         if let Some(last) = self.last {
             if now.duration_since(last) < self.every {

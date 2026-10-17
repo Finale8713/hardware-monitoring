@@ -18,6 +18,7 @@ cargo run --release -- --psu-watts 850 --psu-overhead 100
 cargo run --release -- --llama-url http://127.0.0.1:8080   # scrape a llama.cpp server
 cargo run --release -- --no-llama                          # hide the llama.cpp panel
 cargo run --release -- --llama-api-key-file path\to\key.txt # if server uses --api-key
+cargo run --release -- --no-log                            # skip CSV logging
 ```
 
 Press **q** or **Esc** to quit.
@@ -129,7 +130,7 @@ CPU power reads the RAPL `energy_uj` counter under `/sys/class/powercap`, which 
 `hwmon` as root; otherwise CPU power shows `?`.
 
 The default `--log-path` is the Windows value (`C:\Logs\hardware-temps.csv`); pass `--log-path`
-explicitly on Linux.
+explicitly on Linux, or use `--no-log` to skip CSV logging.
 
 ## Roadmap
 
