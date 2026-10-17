@@ -6,6 +6,8 @@ pub struct Config {
     pub refresh: Duration,
     pub log_every: Duration,
     pub log_path: PathBuf,
+    /// When true, skip CSV logging entirely (no file created).
+    pub no_log: bool,
     pub once: bool,
     pub fahrenheit: bool,
     /// Rated PSU capacity for headroom warnings.
@@ -31,6 +33,7 @@ impl Config {
             refresh,
             log_every,
             log_path: PathBuf::from(args.log_path),
+            no_log: args.no_log,
             once: args.once,
             fahrenheit: !args.celsius,
             psu_watts: args.psu_watts,
@@ -64,6 +67,10 @@ struct Cli {
     /// CSV log file path
     #[arg(long, default_value = r"C:\Logs\hardware-temps.csv")]
     log_path: String,
+
+    /// Disable CSV logging (no file created)
+    #[arg(long)]
+    no_log: bool,
 
     /// Sample once and exit (no TUI loop)
     #[arg(long)]

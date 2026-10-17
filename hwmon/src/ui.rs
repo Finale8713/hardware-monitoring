@@ -90,14 +90,30 @@ pub fn draw(frame: &mut Frame, snap: &Snapshot, cfg: &Config) {
     frame.render_widget(storage_list(snap), storage_area);
     frame.render_widget(network_list(snap), net_area);
 
+    let log_status = if cfg.no_log {
+        "CSV: off (--no-log)".to_string()
+    } else {
+        format!("CSV: {}", cfg.log_path.display())
+    };
     let footer = Paragraph::new(format!(
-        " updated {}  |  CSV: {}",
-        snap.at.format("%H:%M:%S"),
-        cfg.log_path.display()
+        " updated {}  |  {log_status}",
+        snap.at.format("%H:%M:%S")
     ))
     .style(Style::default().fg(Color::DarkGray))
     .block(Block::default().borders(Borders::ALL).title(" Status "));
     frame.render_widget(footer, chunks[2]);
+}
+
+/// Hint when CPU package power is unavailable (platform-specific source).
+fn cpu_power_hint() -> &'static str {
+    #[cfg(windows)]
+    {
+        " power        needs LHM web server"
+    }
+    #[cfg(not(windows))]
+    {
+        " power        needs readable RAPL energy_uj"
+    }
 }
 
 fn power_header_line(p: &crate::sample::PowerEstimate) -> Line<'static> {
@@ -129,7 +145,7 @@ fn cpu_block(snap: &Snapshot, unit: &str, fahrenheit: bool) -> Paragraph<'static
     match snap.power.cpu_w {
         Some(w) => lines.push(Line::from(format!(" power        {w:.1} W"))),
         None => lines.push(Line::from(Span::styled(
-            " power        needs LHM web server",
+            cpu_power_hint(),
             Style::default().fg(Color::Yellow),
         ))),
     }
@@ -458,7 +474,7 @@ fn format_pps(pps: f64) -> String {
     if pps >= 1_000.0 {
         format!("{:.1}k", pps / 1_000.0)
     } else {
-        format!("{:.0}", pps)
+        format!("{pps:.0}")
     }
 }
 
@@ -475,6 +491,6 @@ fn format_rate(bps: f64) -> String {
     } else if bps >= 1_000.0 {
         format!("{:.0} KB/s", bps / 1_000.0)
     } else {
-        format!("{:.0} B/s", bps)
+        format!("{bps:.0} B/s")
     }
 }

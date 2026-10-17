@@ -165,6 +165,8 @@ hwmon.exe --llama-url http://127.0.0.1:8080
 hwmon.exe --no-llama
 # If the server was started with --api-key, point at a local key file:
 hwmon.exe --llama-api-key-file path\to\api-key.txt
+# Skip CSV logging entirely:
+hwmon.exe --no-log
 ```
 
 ---
